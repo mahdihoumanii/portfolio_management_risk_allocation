@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -27,11 +27,14 @@ def download_prices(
         prices = pd.read_csv(price_path, index_col=0, parse_dates=True)
         return prices
 
-    data = yf.download(list(tickers), start=start, end=end, progress=False, auto_adjust=True)
-    if isinstance(data, pd.DataFrame) and "Adj Close" in data.columns:
-        prices = data["Adj Close"]
+    data = yf.download(list(tickers), start=start, end=end, progress=False, auto_adjust=False)
+    if isinstance(data, pd.DataFrame):
+        if isinstance(data.columns, pd.MultiIndex):
+            prices = data["Adj Close"]
+        else:
+            prices = data
     else:
-        prices = data
+        prices = pd.DataFrame(data)
     prices = prices.dropna(how="all")
     ensure_parent(price_path)
     prices.to_csv(price_path, index=True)
@@ -40,13 +43,14 @@ def download_prices(
 
 def compute_log_returns(
     prices: pd.DataFrame,
-    returns_path: str = "data/processed/returns.csv",
+    returns_path: Optional[str] = "data/processed/returns.csv",
 ) -> pd.DataFrame:
     """Compute log returns and cache to disk."""
     returns = np.log(prices / prices.shift(1))
     returns = returns.iloc[1:]
-    ensure_parent(returns_path)
-    returns.to_csv(returns_path, index=True)
+    if returns_path:
+        ensure_parent(returns_path)
+        returns.to_csv(returns_path, index=True)
     return returns
 
 

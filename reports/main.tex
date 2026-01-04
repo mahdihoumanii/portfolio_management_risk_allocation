@@ -1,0 +1,195 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{parskip}
+
+\title{\textbf{Portfolio Management and Risk Allocation}\\
+\large Walk-Forward Backtesting of Allocation Strategies}
+\author{Mohamad ElMahdi Houmani}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+This project implements a full portfolio management and backtesting framework to study classical and risk-based asset allocation strategies under realistic market assumptions.  
+The objective is to compare the risk–return characteristics, turnover, and drawdown behavior of different allocation approaches using a consistent walk-forward methodology with transaction costs.
+
+The framework is designed to be fully reproducible and modular, with cached data loading, rolling covariance estimation, constrained optimization, and comprehensive performance evaluation.
+
+\section{Data and Returns}
+
+The investment universe consists of liquid exchange-traded funds representing multiple asset classes:
+
+\begin{itemize}
+    \item SPY (US equities)
+    \item QQQ (US technology equities)
+    \item EEM (emerging market equities)
+    \item TLT (long-duration US Treasuries)
+    \item IEF (intermediate Treasuries)
+    \item GLD (gold)
+    \item VNQ (US real estate)
+\end{itemize}
+
+Daily adjusted closing prices are downloaded via \texttt{yfinance} and cached locally.  
+Log returns are computed as
+\[
+r_t = \log\left(\frac{P_t}{P_{t-1}}\right),
+\]
+and all annualized statistics use 252 trading days per year.
+
+\section{Covariance Estimation}
+
+Portfolio construction relies on rolling estimates of the return covariance matrix using a 252-day lookback window.  
+The following estimators are implemented:
+
+\begin{itemize}
+    \item \textbf{Sample covariance}
+    \item \textbf{EWMA covariance} with decay parameter $\lambda = 0.94$
+    \item \textbf{Shrinkage covariance} toward the diagonal to reduce estimation noise
+\end{itemize}
+
+Shrinkage improves numerical stability and reduces excessive portfolio turnover, particularly in constrained optimization problems.
+
+\section{Portfolio Strategies}
+
+All strategies are long-only and fully invested unless otherwise stated.
+
+\subsection{Equal Weight}
+A baseline strategy allocating equal capital to each asset.
+
+\subsection{Minimum Variance}
+Weights are chosen to minimize portfolio variance:
+\[
+\min_w \; w^\top \Sigma w \quad \text{s.t.} \quad \sum_i w_i = 1,\; w_i \ge 0.
+\]
+
+\subsection{Mean--Variance}
+A classical Markowitz formulation:
+\[
+\max_w \; \mu^\top w - \frac{\gamma}{2} w^\top \Sigma w,
+\]
+where expected returns $\mu$ are estimated using rolling historical means and $\gamma$ controls risk aversion.
+
+\subsection{Risk Parity}
+Weights are chosen such that each asset contributes equally to total portfolio risk.  
+An iterative solver enforces equal risk contributions under long-only constraints.
+
+\subsection{Volatility Targeting}
+A volatility targeting overlay rescales portfolio exposure to target a fixed annualized volatility (10\%), with leverage capped at 1.5.  
+Any remaining allocation is assigned to cash (assumed zero return).
+
+\section{Backtesting Methodology}
+
+A walk-forward backtest is performed with monthly rebalancing.  
+At each rebalance date:
+\begin{itemize}
+    \item Covariance and expected returns are estimated using only past data.
+    \item Portfolio weights are recomputed.
+    \item Transaction costs are applied based on turnover:
+    \[
+    \text{Cost}_t = c \sum_i |w_i^{(t)} - w_i^{(t-1)}|,
+    \]
+    where $c = 5$ basis points.
+\end{itemize}
+
+Daily portfolio returns are computed using lagged weights to avoid look-ahead bias.
+
+\section{Performance Metrics}
+
+For each strategy, the following metrics are computed:
+\begin{itemize}
+    \item CAGR
+    \item Annualized volatility
+    \item Sharpe and Sortino ratios
+    \item Maximum drawdown
+    \item Calmar ratio
+    \item Average turnover
+    \item Value-at-Risk (95\%) and Conditional VaR (95\%)
+\end{itemize}
+
+The full metrics table is saved as \texttt{reports/metrics.csv} and loaded by both the CLI and the report.
+
+\section{Results}
+
+\subsection{Cumulative Performance}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/cumulative_returns.png}
+\caption{Cumulative portfolio growth for all strategies.}
+\end{figure}
+
+Mean--variance allocation achieves the highest long-term growth, while risk parity exhibits lower returns and larger drawdowns in this universe.
+
+\subsection{Rolling Volatility}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/rolling_vol.png}
+\caption{63-day rolling annualized volatility.}
+\end{figure}
+
+Volatility spikes during the 2020 crisis are clearly visible.  
+The volatility targeting strategy successfully caps realized risk relative to other approaches.
+
+\subsection{Turnover}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/turnover.png}
+\caption{Portfolio turnover by strategy.}
+\end{figure}
+
+Risk parity and mean--variance strategies exhibit higher turnover, explaining their sensitivity to transaction costs.
+
+\subsection{Portfolio Weights}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/weights_min_var.png}
+\caption{Minimum variance portfolio weights.}
+\end{figure}
+
+The minimum variance portfolio closely resembles the equal-weight benchmark due to strong cross-asset correlations and covariance shrinkage.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/weights_risk_parity.png}
+\caption{Risk parity portfolio weights.}
+\end{figure}
+
+Risk parity allocations are highly dynamic, especially during periods of elevated volatility.
+
+\section{Discussion}
+
+The results highlight several important insights:
+\begin{itemize}
+    \item Covariance shrinkage stabilizes optimization but can collapse minimum variance solutions toward equal weighting.
+    \item Mean--variance allocation improves returns at the cost of higher turnover.
+    \item Risk parity without leverage may underperform in equity-dominated regimes.
+    \item Volatility targeting provides effective downside risk control.
+\end{itemize}
+
+\section{Limitations}
+
+The framework assumes:
+\begin{itemize}
+    \item No short-selling
+    \item Constant transaction costs
+    \item No estimation uncertainty beyond rolling windows
+\end{itemize}
+
+Extensions could include regime detection, Bayesian return estimation, or derivative-based risk overlays.
+
+\section{Conclusion}
+
+This project demonstrates a complete, production-style portfolio management pipeline, combining sound financial theory with robust numerical implementation and realistic backtesting discipline.
+
+\end{document}

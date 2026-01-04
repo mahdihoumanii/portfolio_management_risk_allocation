@@ -4,14 +4,7 @@ from typing import Dict, Iterable, List, Tuple
 import numpy as np
 import pandas as pd
 
-from src.strategies.allocations import (
-    apply_vol_targeting,
-    equal_weight,
-    mean_variance_weights,
-    min_variance_weights,
-    project_to_simplex,
-    risk_parity_weights,
-)
+from src.strategies.allocations import apply_vol_targeting, equal_weight, mean_variance_weights, min_variance_weights, risk_parity_weights
 from src.strategies.covariance import ewma_covariance, sample_covariance, shrinkage_covariance
 from src.utils.metrics import compute_metrics
 
@@ -55,6 +48,8 @@ def run_backtest(
     target_vol: float = 0.10,
     lmax: float = 1.5,
 ) -> BacktestResult:
+    if len(returns) <= window:
+        raise ValueError("Not enough data for the chosen window length.")
     assets = list(returns.columns)
     n_assets = len(assets)
     tc = tc_bps / 10000.0
@@ -89,7 +84,7 @@ def run_backtest(
                 "min_variance": w_min,
                 "mean_variance": w_mv,
                 "risk_parity": w_rp,
-                "vol_target": project_to_simplex(w_vol),
+                "vol_target": w_vol,
             }
             last_reb_index = i
         else:
