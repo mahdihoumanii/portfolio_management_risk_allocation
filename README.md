@@ -86,3 +86,16 @@ Generated automatically when running the CLI or notebooks:
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+## Run Backtest (CLI)
+
+Example command to run the full walk-forward backtest:
+
+```bash
+python -m src.cli.backtest \
+  --start 2012-01-01 \
+  --end 2025-01-01 \
+  --rebalance monthly \
+  --window 252 \
+  --tc_bps 5 \
+  --cov_method shrinkage
