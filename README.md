@@ -87,6 +87,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
+```
+
 ## Run Backtest (CLI)
 
 Example command to run the full walk-forward backtest:
@@ -99,3 +101,4 @@ python -m src.cli.backtest \
   --window 252 \
   --tc_bps 5 \
   --cov_method shrinkage
+```
